@@ -6,7 +6,7 @@ import TaskForm from "./TaskForm";
 
 const TaskList = () => {
   const dispatch = useAppDispatch();
-  const { items, status, error } = useAppSelector((state) => state.tasks);
+  const { items, status } = useAppSelector((state) => state.tasks);
 
   useEffect(() => {
     dispatch(loadTasks());
