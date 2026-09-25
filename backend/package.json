@@ -22,16 +22,16 @@
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.10.1",
     "reflect-metadata": "^0.2.2",
-    "socket.io": "^4.8.3"
-  },
-  "devDependencies": {
+    "socket.io": "^4.8.3",
     "@types/bcryptjs": "^2.4.6",
     "@types/cookie": "^0.6.0",
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
-    "@types/node": "^22.20.3",
+    "@types/node": "^22.20.3"
+  },
+  "devDependencies": {
     "tsx": "^4.23.13",
     "typescript": "^7.0.2"
   }
