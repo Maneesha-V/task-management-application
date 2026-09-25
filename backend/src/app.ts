@@ -8,13 +8,14 @@ import statsRoutes from "./routes/stats.routes";
 
 const app: Application = express();
 
-// app.use(cors({ origin: process.env.CLIENT_URL || "*" }));
+const allowedOrigins: string[] = [
+  "http://localhost:5173",
+  process.env.CLIENT_URL,
+].filter((origin): origin is string => Boolean(origin));
+
 app.use(
   cors({
-     origin: [
-      "http://localhost",
-      "http://localhost:5173",
-    ],
+    origin: allowedOrigins,
     credentials: true,
   })
 );
