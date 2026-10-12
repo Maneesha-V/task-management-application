@@ -3,12 +3,15 @@ import { inject, injectable } from "inversify";
 import TYPES from "../config/inversify/types";
 import { TaskService } from "../services/task.service";
 import { getIO } from "../socket/socket";
+import { StatsService } from "../services/stats.service";
 
 @injectable()
 export class TaskController {
   constructor(
     @inject(TYPES.TaskService)
     private readonly taskService: TaskService,
+    @inject(TYPES.StatsService)
+    private readonly statsService: StatsService,
   ) {}
   getTasks = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -42,10 +45,10 @@ export class TaskController {
       if (owner) {
         getIO().to(owner).emit("taskCreated", task);
       }
+      this.notify(owner, "taskCreated", task)
       res.status(201).json(task);
     } catch (err) {
       console.error(err);
-
       next(err);
     }
   };
@@ -64,6 +67,7 @@ export class TaskController {
       if (owner) {
         getIO().to(owner).emit("taskDeleted", { id: taskId });
       }
+      this.notify(owner, "taskDeleted", { id: taskId });
       res.json({ message: "Task deleted", id: req.params.id });
     } catch (err) {
       console.log(err);
@@ -74,7 +78,7 @@ export class TaskController {
   getTaskById = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const taskId = req.params.id as string;
-            const owner = req.user?.userId
+      const owner = req.user?.userId
       if(!owner) return res.status(401).json({ message: "Unauthorised access." });
       if (!taskId) {
         return res.status(404).json({ message: "Task ID is required" });
@@ -110,9 +114,17 @@ export class TaskController {
       if (owner) {
         getIO().to(owner).emit("taskUpdated", task);
       }
+      this.notify(owner, "taskUpdated", task);
       res.json(task);
     } catch (err) {
       next(err);
     }
   };
+  notify = async (userId: string, event: string, payload: unknown) => {
+    if(userId) {
+      getIO().to(userId).emit(event, payload)
+    }
+    const stats = await this.statsService.getTaskStats(userId);
+    getIO().to(userId).emit("statsUpdated", stats);
+  }
 }

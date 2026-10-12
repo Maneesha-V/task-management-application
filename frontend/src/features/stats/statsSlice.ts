@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import type { TaskStats } from "../../types/statsTypes";
 import { fetchStatsAPI } from "./statsAPI";
+import type { PayloadAction } from "@reduxjs/toolkit";
 
 interface StatsState {
   data: TaskStats | null;
@@ -14,7 +15,6 @@ const initialState: StatsState = {
   error: null,
 };
 
-// export const loadStats = createAsyncThunk("stats/loadStats", fetchStatsAPI);
 
 export const loadStats = createAsyncThunk(
   "stats/loadStats",
@@ -33,7 +33,12 @@ export const loadStats = createAsyncThunk(
 const statsSlice = createSlice({
   name: "stats",
   initialState,
-  reducers: {},
+  reducers: {
+    statsUpdatedFromSocket (state, action: PayloadAction<TaskStats>) {
+      state.status = "succeeded";
+      state.data = action.payload;
+    }
+  },
   extraReducers: (builder) => {
     builder
       .addCase(loadStats.pending, (state) => {
@@ -50,4 +55,5 @@ const statsSlice = createSlice({
   },
 });
 
+export const { statsUpdatedFromSocket } = statsSlice.actions;
 export default statsSlice.reducer;

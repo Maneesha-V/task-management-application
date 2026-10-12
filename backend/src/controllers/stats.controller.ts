@@ -11,8 +11,8 @@ export class StatsController {
   ) {}
 getTaskStats = async (req: Request, res: Response, next: NextFunction) => {
   try {
-       const owner = req.user?.userId
-      if(!owner) return res.status(401).json({ message: "Unauthorised access." });
+    const owner = req.user?.userId
+    if(!owner) return res.status(401).json({ message: "Unauthorised access." });
     const stats = await this.statsService.getTaskStats(owner);
     res.json(stats);
   } catch (err) {

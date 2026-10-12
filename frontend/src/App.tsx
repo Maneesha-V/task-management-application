@@ -10,11 +10,12 @@ import Login from "./pages/auth/Login";
 import { useTaskSocket } from "./hooks/useTaskSocket";
 import Dashboard from "./pages/stats/Dashboard";
 import NotFoundPage from "./pages/NotFoundPage";
+import { RealtimeListener } from "./components/RealtimeListener";
 
 const TasksPage = () => {
   const dispatch = useAppDispatch();
   const { user } = useAppSelector((state) => state.auth);
-  useTaskSocket();
+  // useTaskSocket();
 
   return (
     <div className="min-h-screen bg-base text-ink">
@@ -58,6 +59,7 @@ function App() {
 
   return (
     <BrowserRouter>
+      <RealtimeListener />
       <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
       <Routes>
         <Route path="/login" element={<Login />} />

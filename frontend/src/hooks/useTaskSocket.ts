@@ -7,6 +7,8 @@ import {
   taskDeletedFromSocket,
 } from "../features/tasks/tasksSlice";
 import type { Task } from "../types/taskTypes";
+import { statsUpdatedFromSocket } from "../features/stats/statsSlice";
+import type { TaskStats } from "../types/statsTypes";
 
 // Connects once the user is authenticated, disconnects on logout/unmount.
 export const useTaskSocket = () => {
@@ -43,12 +45,17 @@ export const useTaskSocket = () => {
       dispatch(taskDeletedFromSocket(id));
     });
 
+    socket.on("statsUpdated", (stats: TaskStats) => {
+      dispatch(statsUpdatedFromSocket(stats))
+    });
+
     return () => {
       socket.off("connect");
       socket.off("connect_error");
       socket.off("taskCreated");
       socket.off("taskUpdated");
       socket.off("taskDeleted");
+      socket.off("statsUpdated");
       disconnectSocket();
     };
   }, [checkedAuth, user, dispatch]);
