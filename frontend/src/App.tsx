@@ -7,7 +7,6 @@ import { BrowserRouter, Link, Navigate, Route, Routes } from "react-router-dom";
 import Register from "./pages/auth/Register";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Login from "./pages/auth/Login";
-import { useTaskSocket } from "./hooks/useTaskSocket";
 import Dashboard from "./pages/stats/Dashboard";
 import NotFoundPage from "./pages/NotFoundPage";
 import { RealtimeListener } from "./components/RealtimeListener";
