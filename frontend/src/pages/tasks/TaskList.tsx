@@ -21,6 +21,7 @@ const TaskList = () => {
       )}
       {/* {status === "failed" && <p className="text-sm text-red-600">{error}</p>}
       {error && <p className="text-sm text-red-400">{error}</p>} */}
+
       <ul className="flex flex-col gap-3">
         {items.map((task) => (
           <TaskItem key={task._id} task={task} />

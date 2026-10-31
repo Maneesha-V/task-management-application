@@ -1,7 +1,6 @@
 import { inject, injectable } from "inversify";
 import TYPES from "../config/inversify/types";
 import type { ITaskService } from "./interfaces/ITaskService";
-import type { ITask } from "../models/Task.model";
 import { ApiError } from "../utils/ApiError";
 import { ITaskRepository } from "../repositories/interfaces/ITaskRepository";
 import { TaskDTO, TaskPayload } from "../types/taskTypes";
@@ -14,7 +13,7 @@ export class TaskService implements ITaskService {
     private readonly taskRepository: ITaskRepository,
   ) {}
 
-  private validate(data: Partial<TaskPayload>): void {
+  private async validate(data: Partial<TaskPayload>, owner: string): Promise<void> {
     if (!data.title?.trim()) throw new ApiError(400, "Title is required");
     if (!data.status) throw new ApiError(400, "Status is required");
     if (!data.dueDate) throw new ApiError(400, "Due date is required");
@@ -23,11 +22,18 @@ export class TaskService implements ITaskService {
     if (new Date(data.dueDate) < today) {
       throw new ApiError(400, "Due date cannot be in the past");
     }
+
+    const exists = await this.taskRepository.existsByTitle(
+      owner,
+      data.title
+    );
+    if (exists)
+      throw new ApiError(409, "A task with this title already exists");
   }
 
   async getTasks(owner: string): Promise<TaskDTO[]> {
     const tasks = await this.taskRepository.findAllByOwner(owner);
-    return TaskMapper.mapTasksDTO(tasks)
+    return TaskMapper.mapTasksDTO(tasks);
   }
 
   async getTaskById(taskId: string, owner: string): Promise<TaskDTO> {
@@ -37,14 +43,22 @@ export class TaskService implements ITaskService {
   }
 
   async createTask(owner: string, data: TaskPayload): Promise<TaskDTO> {
-    this.validate(data);
+    await this.validate(data, owner);
     const task = await this.taskRepository.createTask({ ...data, owner });
-    return TaskMapper.mapTaskDTO(task)
+    return TaskMapper.mapTaskDTO(task);
   }
 
-  async updateTask(taskId: string, owner: string, data: TaskPayload): Promise<TaskDTO> {
-    this.validate(data);
-    const task = await this.taskRepository.updateByIdAndOwner(taskId, owner, data);
+  async updateTask(
+    taskId: string,
+    owner: string,
+    data: TaskPayload,
+  ): Promise<TaskDTO> {
+    await this.validate(data, owner);
+    const task = await this.taskRepository.updateByIdAndOwner(
+      taskId,
+      owner,
+      data,
+    );
     if (!task) throw new ApiError(404, "Task not found");
     return TaskMapper.mapTaskDTO(task);
   }

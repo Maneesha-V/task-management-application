@@ -18,6 +18,10 @@ export class TaskRepository
     return await this.create(data as unknown as Partial<ITask>);
   }
 
+  async existsByTitle(owner: string, title: string): Promise<boolean> {
+    const found =  await this.findOne({owner, title})
+    return found !== null
+  }
   async findAllByOwner(owner: string): Promise<ITask[]> {
     return await this.model.find({ owner }).sort({ createdAt: -1 });
   }
