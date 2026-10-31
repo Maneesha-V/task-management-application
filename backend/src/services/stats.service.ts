@@ -1,12 +1,13 @@
 import { inject, injectable } from "inversify";
 import TYPES from "../config/inversify/types";
-import { TaskRepository } from "../repositories/task.repository";
+import { ITaskRepository } from "../repositories/interfaces/ITaskRepository";
+import { IStatsService } from "./interfaces/IStatsService";
 
 @injectable()
-export class StatsService {
+export class StatsService implements IStatsService {
   constructor(
     @inject(TYPES.TaskRepository)
-    private readonly taskRepository: TaskRepository,
+    private readonly taskRepository: ITaskRepository,
   ) {}
   async getTaskStats(owner: string) {
     const { statusCounts, total, overdue } =

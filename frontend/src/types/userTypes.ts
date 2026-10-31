@@ -1,13 +1,13 @@
 export interface User {
-  id: string;
+  _id: string;
   name: string;
   email: string;
 }
 export type LoginResp = {
-    success: boolean,
-          message: string;
-          data: {
-            accessToken: string,
-            user: User,
-          },
-}
+  success: boolean;
+  message: string;
+  data: {
+    accessToken: string;
+    user: User;
+  };
+};

@@ -1,119 +1,103 @@
 import { inject, injectable } from "inversify";
-import TYPES from "../config/inversify/types";
-import { UserRepository } from "../repositories/user.repository";
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
+import TYPES from "../config/inversify/types";
+import type { IUserRepository } from "../repositories/interfaces/IUserRepository";
+import type { IAuthService } from "./interfaces/IAuthService";
+import type { IUser } from "../models/User.model";
+import type {
+  AuthResult,
+  AuthTokens,
+  RefreshResult,
+} from "../types/authTypes";
 import { ApiError } from "../utils/ApiError";
-import { generateAccessToken, generateRefreshToken } from "../utils/jwt";
+import {
+  generateAccessToken,
+  generateRefreshToken,
+  verifyRefreshToken,
+} from "../utils/jwt";
+import { UserMapper } from "../mappers/UserMapper";
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MIN_PASSWORD_LENGTH = 6;
 
 @injectable()
-export class AuthService {
+export class AuthService implements IAuthService {
   constructor(
     @inject(TYPES.UserRepository)
-    private readonly userRepository: UserRepository,
+    private readonly userRepository: IUserRepository,
   ) {}
-  async register(name: string, email: string, password: string) {
-    const existingUser = await this.userRepository.findByEmail(email);
 
-    if (existingUser) {
-      throw new ApiError(409, "Email already exists");
+  private async issueTokens(user: IUser): Promise<AuthTokens> {
+    const userId = String(user._id);
+    const accessToken = generateAccessToken(userId);
+    const refreshToken = generateRefreshToken(userId);
+    await this.userRepository.updateRefreshToken(userId, refreshToken);
+    return { accessToken, refreshToken };
+  }
+
+  async register(name: string, email: string, password: string): Promise<AuthResult> {
+    const cleanName = name.trim();
+    const cleanEmail = email.trim().toLowerCase();
+
+    if (!cleanName) throw new ApiError(400, "Name is required");
+    if (!EMAIL_REGEX.test(cleanEmail)) throw new ApiError(400, "Invalid email address");
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      throw new ApiError(400, `Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const existingUser = await this.userRepository.findByEmail(cleanEmail);
+    if (existingUser) throw new ApiError(409, "Email already exists");
 
     const user = await this.userRepository.create({
-      name,
-      email,
-      password: hashedPassword,
+      name: cleanName,
+      email: cleanEmail,
+      password: await bcrypt.hash(password, 10),
     });
-    if (!user) {
-      throw new ApiError(401, "Failed to create user.");
-    }
-    const accessToken = generateAccessToken(user._id.toString());
-    const refreshToken = generateRefreshToken(user._id.toString());
 
-    return {
-      user: { id: user._id, name: user.name, email: user.email },
-      accessToken,
-      refreshToken,
+    const tokens = await this.issueTokens(user);
+
+    return { 
+      user: UserMapper.mapUserDTO(user), 
+      ...tokens 
     };
   }
-  async login(email: string, password: string) {
-    const user = await this.userRepository.findByEmail(email);
 
-    if (!user) {
+  async login(email: string, password: string): Promise<AuthResult> {
+    const user = await this.userRepository.findByEmail(email.trim().toLowerCase(), true);
+
+    if (!user || !(await bcrypt.compare(password, user.password))) {
       throw new ApiError(401, "Invalid email or password");
     }
 
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-
-    if (!isPasswordValid) {
-      throw new ApiError(401, "Invalid email or password");
-    }
-    const accessToken = generateAccessToken(user._id.toString());
-
-    const refreshToken = generateRefreshToken(user._id.toString());
-
-    await this.userRepository.updateRefreshToken(
-      user._id.toString(),
-      refreshToken,
-    );
-
-    const updatedUser = await this.userRepository.findById(user._id.toString());
-
-    return {
-      accessToken,
-      refreshToken,
-      user: {
-        id: user._id.toString(),
-        name: user.name,
-        email: user.email,
-      },
-    };
+    const tokens = await this.issueTokens(user);
+    return { user: UserMapper.mapUserDTO(user), ...tokens };
   }
-  async logout(token: string) {
-    if (!token) {
-      throw new ApiError(401, "Refresh token missing");
+
+  async logout(token?: string): Promise<void> {
+    if (!token) return;
+
+    let userId: string;
+    try {
+      userId = verifyRefreshToken(token).userId;
+    } catch {
+      return; 
     }
-
-    const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET!) as {
-      userId: string;
-    };
-
-    await this.userRepository.updateRefreshToken(decoded.userId, null);
-
-    return {
-      message: "Logout successful",
-    };
+    await this.userRepository.updateRefreshToken(userId, null);
   }
-  async refreshToken(token: string) {
-    if (!token) {
-      throw new ApiError(401, "Refresh token missing");
-    }
 
-    const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET!) as {
-      userId: string;
-    };
+  async refreshToken(token?: string): Promise<RefreshResult> {
+    if (!token) throw new ApiError(401, "Refresh token missing");
 
-    const user = await this.userRepository.findById(decoded.userId);
+    const { userId } = verifyRefreshToken(token);
+    const user = await this.userRepository.findById(userId);
 
-    if (!user) {
-      throw new ApiError(404, "User not found");
-    }
-
-    if (user.refreshToken !== token) {
+    if (!user || user.refreshToken !== token) {
       throw new ApiError(401, "Invalid refresh token");
     }
 
-    const accessToken = generateAccessToken(user._id.toString());
-
     return {
-      accessToken,
-      user: {
-        id: user._id.toString(),
-        name: user.name,
-        email: user.email,
-      },
+      accessToken: generateAccessToken(userId),
+      user: UserMapper.mapUserDTO(user),
     };
   }
 }

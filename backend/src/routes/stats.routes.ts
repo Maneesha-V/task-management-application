@@ -1,12 +1,12 @@
 import { Router } from "express";
 import { authenticate } from "../middlewares/auth.middleware";
 import container from "../config/inversify/container";
-import { StatsController } from "../controllers/stats.controller";
 import TYPES from "../config/inversify/types";
+import { IStatsController } from "../controllers/interfaces/IStatsController";
 
 const router = Router();
 
-const statsController = container.get<StatsController>(
+const statsController = container.get<IStatsController>(
   TYPES.StatsController
 );
 

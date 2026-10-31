@@ -1,14 +1,12 @@
 import { Router } from "express";
-import {
-  TaskController,
-} from "../controllers/task.controller";
 import TYPES from "../config/inversify/types";
 import container from "../config/inversify/container";
 import { authenticate } from "../middlewares/auth.middleware";
+import { ITaskController } from "../controllers/interfaces/ITaskController";
 
 const router = Router();
 
-const taskController = container.get<TaskController>(
+const taskController = container.get<ITaskController>(
   TYPES.TaskController
 );
 

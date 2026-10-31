@@ -1,130 +1,98 @@
-import { NextFunction, Request, Response } from "express";
+import type { NextFunction, Request, Response } from "express";
 import { inject, injectable } from "inversify";
 import TYPES from "../config/inversify/types";
-import { TaskService } from "../services/task.service";
+import type { ITaskService } from "../services/interfaces/ITaskService";
 import { getIO } from "../socket/socket";
-import { StatsService } from "../services/stats.service";
+import { ApiError } from "../utils/ApiError";
+import { ITaskController } from "./interfaces/ITaskController";
+import { IStatsService } from "../services/interfaces/IStatsService";
 
 @injectable()
-export class TaskController {
+export class TaskController implements ITaskController {
   constructor(
     @inject(TYPES.TaskService)
-    private readonly taskService: TaskService,
+    private readonly taskService: ITaskService,
     @inject(TYPES.StatsService)
-    private readonly statsService: StatsService,
+    private readonly statsService: IStatsService,
   ) {}
+
+  private getOwner(req: Request): string {
+    const owner = req.user?.userId;
+    if (!owner) throw new ApiError(401, "Unauthorised access.");
+    return owner;
+  }
+
+  private getTaskId(req: Request): string {
+    const id = req.params.id;
+    if (!id || Array.isArray(id)) throw new ApiError(400, "Task ID is required");
+    return id;
+  }
+
   getTasks = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const owner = req.user?.userId
-      if(!owner) return res.status(401).json({ message: "Unauthorised access." });
-      const tasks = await this.taskService.getTasks(owner);
+      const tasks = await this.taskService.getTasks(this.getOwner(req));
       res.json(tasks);
     } catch (err) {
       next(err);
     }
   };
-  createTask = async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      console.log(req.body);
-      console.log(req.user);
-      const owner = req.user?.userId
-      if(!owner) return res.status(401).json({ message: "Unauthorised access." });
-      
-      const { title, status, dueDate } = req.body;
-      if (!title) return res.status(400).json({ message: "Title is required" });
-      if (!status)
-        return res.status(400).json({ message: "Status is required" });
-      if (!dueDate)
-        return res.status(400).json({ message: "Due date is required" });
-      if (dueDate && new Date(dueDate) < new Date(new Date().toDateString())) {
-        return res
-          .status(400)
-          .json({ message: "Due date cannot be in the past" });
-      }
-      const task = await this.taskService.createTask({...req.body, owner});
-      if (owner) {
-        getIO().to(owner).emit("taskCreated", task);
-      }
-      this.notify(owner, "taskCreated", task)
-      res.status(201).json(task);
-    } catch (err) {
-      console.error(err);
-      next(err);
-    }
-  };
-  deleteTask = async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const taskId = req.params.id as string;
-      const owner = req.user?.userId
-      if(!owner) return res.status(401).json({ message: "Unauthorised access." });
 
-      if (!taskId) {
-        return res.status(404).json({ message: "Task ID is required" });
-      }
-      const task = await this.taskService.deleteTask(taskId, owner);
-      if (!task) return res.status(404).json({ message: "Task not found" });
-
-      if (owner) {
-        getIO().to(owner).emit("taskDeleted", { id: taskId });
-      }
-      this.notify(owner, "taskDeleted", { id: taskId });
-      res.json({ message: "Task deleted", id: req.params.id });
-    } catch (err) {
-      console.log(err);
-      
-      next(err);
-    }
-  };
   getTaskById = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const taskId = req.params.id as string;
-      const owner = req.user?.userId
-      if(!owner) return res.status(401).json({ message: "Unauthorised access." });
-      if (!taskId) {
-        return res.status(404).json({ message: "Task ID is required" });
-      }
-      const task = await this.taskService.getTaskById(taskId, owner);
-      if (!task) return res.status(404).json({ message: "Task not found" });
+      const task = await this.taskService.getTaskById(
+        this.getTaskId(req),
+        this.getOwner(req),
+      );
       res.json(task);
     } catch (err) {
       next(err);
     }
   };
+
+  createTask = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const owner = this.getOwner(req);
+      const task = await this.taskService.createTask(owner, req.body);
+      this.notify(owner, "taskCreated", task);
+      res.status(201).json(task);
+    } catch (err) {
+      next(err);
+    }
+  };
+
   updateTask = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const taskId = req.params.id as string;
-        const owner = req.user?.userId
-      if(!owner) return res.status(401).json({ message: "Unauthorised access." });
-      if (!taskId) {
-        return res.status(404).json({ message: "Task ID is required" });
-      }
-      const { title, status, dueDate } = req.body;
-      if (!title) return res.status(400).json({ message: "Title is required" });
-      if (!status)
-        return res.status(400).json({ message: "Status is required" });
-      if (!dueDate)
-        return res.status(400).json({ message: "Due date is required" });
-      if (dueDate && new Date(dueDate) < new Date(new Date().toDateString())) {
-        return res
-          .status(400)
-          .json({ message: "Due date cannot be in the past" });
-      }
-      const task = await this.taskService.updateTask(taskId, {...req.body,owner});
-      if (!task) return res.status(404).json({ message: "Task not found" });
-      if (owner) {
-        getIO().to(owner).emit("taskUpdated", task);
-      }
+      const owner = this.getOwner(req);
+      const task = await this.taskService.updateTask(
+        this.getTaskId(req),
+        owner,
+        req.body,
+      );
       this.notify(owner, "taskUpdated", task);
       res.json(task);
     } catch (err) {
       next(err);
     }
   };
-  notify = async (userId: string, event: string, payload: unknown) => {
-    if(userId) {
-      getIO().to(userId).emit(event, payload)
+
+  deleteTask = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const owner = this.getOwner(req);
+      const taskId = this.getTaskId(req);
+      await this.taskService.deleteTask(taskId, owner);
+      this.notify(owner, "taskDeleted", { id: taskId });
+      res.json({ message: "Task deleted", id: taskId });
+    } catch (err) {
+      next(err);
     }
-    const stats = await this.statsService.getTaskStats(userId);
-    getIO().to(userId).emit("statsUpdated", stats);
+  };
+
+  private notify(userId: string, event: string, payload: unknown): void {
+    const io = getIO();
+    io.to(userId).emit(event, payload);
+    this.statsService
+      .getTaskStats(userId)
+      .then((stats) => io.to(userId).emit("statsUpdated", stats))
+      .catch((err) => console.error("Failed to emit stats:", err));
   }
 }

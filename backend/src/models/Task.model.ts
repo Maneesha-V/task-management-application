@@ -6,7 +6,7 @@ export interface ITask extends Document {
   description?: string;
   status: TaskStatus;
   dueDate?: Date;
-  owner?: Types.ObjectId; 
+  owner: Types.ObjectId; 
   createdAt: Date;
   updatedAt: Date;
 }
